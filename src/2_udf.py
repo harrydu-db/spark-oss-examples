@@ -29,7 +29,7 @@ combined_df = records_df.crossJoin(rules_df)
 # Define a UDF to evaluate the expression
 def evaluate_expr(expression, col1, col2):
     try:
-        return eval(expression.replace("col1", str(col1)).replace("col1", str(col1)))
+        return eval(expression.replace("col1", str(col1)).replace("col2", str(col2)))
     except Exception as e:
         return False
 
