@@ -166,6 +166,12 @@ rule_structs = [
     )
     for rule_id, sql_exp in rules_data
 ]
+
+# Add the array column and explode it
+result_df = records_df.withColumn("rules", array(*rule_structs)) \
+    .select("id", "col1", "col2", explode("rules").alias("rule")) \
+    .select("id", "col1", "col2", "rule.rule_id", "rule.sql_exp", "rule.rule_passed")
+    
 ```
 This approach:
 - Combines all rule evaluations into a single column
