@@ -33,9 +33,9 @@ rules_data = [
 
 We explore several approaches to solve this problem, each with its own advantages and limitations:
 
-### 1. Using crossjoin (`1_expr.py`)
+### 1. Using `crossjoin`, `when` and `expr` (`1_expr.py`)
 
-This code doesn't work, because expr expect a string literal as the input. 
+This code doesn't work, because `expr` expects a string literal as the input. 
 ```python
 result_df = combined_df.withColumn(
     "rule_passed",
@@ -43,8 +43,7 @@ result_df = combined_df.withColumn(
 )
 ```
 
-My solution is to create a map from rule_id to the `expr()` function. Then use `when` clause. 
-
+This solutiom uses a crossjoin, dynamically generated `when` clause,  and `expr`.
 
 ### 2. Basic UDF (`2_udf.py`)
 ```python
