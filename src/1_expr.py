@@ -24,16 +24,13 @@ rules_data = [
 ]
 rules_df = spark.createDataFrame(rules_data, ["rule_id", "sql_exp"])
 
-# Cross join records with rules to get all combinations
-combined_df = records_df.crossJoin(rules_df)
-
 # Build when clause dynamically
 when_clause = when(lit(False), lit(False))  # Start with empty when clause
 for rule_id, sql_exp in rules_data:
     when_clause = when_clause.when(col("rule_id") == rule_id, expr(sql_exp))
 
-# Apply the rule evaluation
-result_df = combined_df.withColumn(
+# Cross join records with rules and evaluate rules in one step
+result_df = records_df.crossJoin(rules_df).withColumn(
     "rule_passed",
     when_clause
 )
