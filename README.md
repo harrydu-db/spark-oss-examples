@@ -1,228 +1,54 @@
 # Spark OSS Examples
 
-This repository contains examples of using Apache Spark for various data processing tasks.
+This repository contains various examples demonstrating different approaches and best practices for using Apache Spark. The examples are designed to help developers understand and implement common Spark patterns and use cases.
 
-## Problem: Rule Evaluation on DataFrame
+## Project Structure
 
-The problem we're trying to solve is evaluating multiple rules (conditions) on each row of a DataFrame and presenting the results in a structured format. Specifically:
-
-1. We have a DataFrame with records containing numeric columns
-2. We have a set of rules defined as SQL expressions
-3. We want to evaluate each rule against each record
-4. We want to present the results showing which rules passed/failed for each record
-
-### Example Data
-
-```python
-# Records DataFrame
-records = [
-    (1, 10, 5),   # id, col1, col2
-    (2, 20, 15),
-    (3, 30, 30)
-]
-
-# Rules DataFrame
-rules_data = [
-    (1, "col1 > col2"),
-    (2, "col1 < col2"),
-    (3, "col1 == col2")
-]
+```
+.
+├── src / rule_eval/           # Examples of different approaches for dynamic SQL expression evaluation
+│   ├── 1_udf.py        # Basic UDF implementation
+│   ├── 2_pandas_udf.py # Pandas UDF implementation
+│   └── ...
+└── src/ ...                # Other Spark examples
+    ├── ...
+    └── ...
 ```
 
-## Solution Approaches
+## Rule Evaluation Examples
 
-We explore several approaches to solve this problem, each with its own advantages and limitations:
+The `rule_eval` directory contains different implementations for evaluating dynamic SQL expressions in Spark. Each example demonstrates a different approach:
 
-### 1. Using `crossjoin`, `when` and `expr` (`1_expr.py`)
 
-This code doesn't work, because `expr` expects a string literal as the input. 
-```python
-result_df = combined_df.withColumn(
-    "rule_passed",
-    expr("sql_exp")
-)
+## Getting Started
+
+### Prerequisites
+
+- Python 3.7+
+- Apache Spark 3.0+
+- PySpark
+
+### Installation
+
+Install dependencies:
+```bash
+pip install -r requirements.txt
 ```
+Apache Spark is also required to run the code. 
 
-This solutiom uses a crossjoin, dynamically generated `when` clause,  and `expr`.
+### Running Examples
 
-Alternatively, you can use a when string with expr(whenstr). See `1_a_whenstr.py`. 
-
-### 2. Basic UDF (`2_udf.py`)
-```python
-def evaluate_expr(expression, col1, col2):
-    try:
-        return eval(expression.replace("col1", str(col1)).replace("col2", str(col2)))
-    except Exception as e:
-        return False
-
-evaluate_expr_udf = udf(evaluate_expr, BooleanType())
-```
-This approach:
-- Uses a simple UDF to evaluate expressions
-- Hardcodes column names in the replacement
-- Limited to specific columns (col1, col2)
-
-Drawbacks:
-- Hardcoded column names make it inflexible for different schemas
-- Simple string replacement can be fragile:
-  - If column names are substrings of each other (e.g., "col" and "col1"), replacements can be incorrect
-  - If column names appear in string literals, they might be incorrectly replaced
-  - No handling of column names that might contain special characters
-- Requires code changes to add new columns
-- No type safety for column values
-
-### 3. General UDF (`3_udf_general.py`)
-```python
-def evaluate_expr(expression, column_values):
-    try:
-        expr = expression
-        for col_name in RECORD_COLUMNS:
-            if col_name in expr:
-                expr = expr.replace(col_name, str(column_values[col_name]))
-        return eval(expr)
-    except Exception as e:
-        return False
-```
-This approach:
-- More flexible with column names
-- Uses a struct to pass all column values
-- Handles any number of columns
-
-Drawbacks:
-- Simple string replacement can be fragile:
-  - If column names are substrings of each other (e.g., "col" and "col1"), replacements can be incorrect
-  - If column names appear in string literals, they might be incorrectly replaced
-  - No handling of column names that might contain special characters
-- No type safety for column values
-- Potential performance impact from multiple string replacements
-- No validation of expression syntax before evaluation
-
-### 4. UDF with Type Annotations (`4_udf_annotation.py`)
-```python
-@udf(returnType=BooleanType())
-def evaluate_expr(expression: str, column_values: dict) -> bool:
-    try:
-        expr = expression
-        for col_name in RECORD_COLUMNS:
-            if col_name in expr:
-                expr = expr.replace(col_name, str(column_values[col_name]))
-        return eval(expr)
-    except Exception as e:
-        return False
-```
-This approach:
-- Uses Python type hints for better code clarity
-- Same functionality as the general UDF
-- Better IDE support and type checking
-
-### 5. UDTF 
-
-TBD. Not working yet.
-
-### 6. UDF with Regex (`6_udf_expr_regex.py`)
-```python
-@udf(returnType=BooleanType())
-def evaluate_expr(expression: str, column_values: dict) -> bool:
-    try:
-        pattern = '|'.join(RECORD_COLUMNS)
-        def replace_match(match):
-            return str(column_values[match.group(0)])
-        expr = re.sub(pattern, replace_match, expression)
-        return eval(expr)
-    except Exception as e:
-        return False
-```
-This approach:
-- Uses regex for more efficient column name replacement
-- Handles column names that might be substrings of each other
-- More robust than simple string replacement
-
-### 7. Adding Columns (`8_adding_columns.py`)
-```python
-# First approach: Individual columns
-for rule_id, sql_exp in rules_data:
-    result_df = result_df.withColumn(
-        f"rule_{rule_id}", 
-        expr(sql_exp)
-    )
-
-# Second approach: Exploded results
-rule_structs = [
-    struct(
-        lit(rule_id).alias("rule_id"),
-        lit(sql_exp).alias("sql_exp"),
-        col(f"rule_{rule_id}").alias("rule_passed")
-    )
-    for rule_id, sql_exp in rules_data
-]
-```
-This approach:
-- Creates separate columns for each rule
-- Can be transformed into a long format using structs and explode
-- More efficient than UDFs for simple expressions
-
-### 8. Single Column Solution (`9_add_one_column.py`)
-```python
-rule_structs = [
-    struct(
-        lit(rule_id).alias("rule_id"),
-        lit(sql_exp).alias("sql_exp"),
-        expr(sql_exp).alias("rule_passed")
-    )
-    for rule_id, sql_exp in rules_data
-]
-
-# Add the array column and explode it
-result_df = records_df.withColumn("rules", array(*rule_structs)) \
-    .select("id", "col1", "col2", explode("rules").alias("rule")) \
-    .select("id", "col1", "col2", "rule.rule_id", "rule.sql_exp", "rule.rule_passed")
-    
-```
-This approach:
-- Combines all rule evaluations into a single column
-- More efficient than creating multiple columns
-- Directly evaluates expressions without intermediate columns
-
-### 9. For-Loop Solution (`a_for_rule_loop.py`)
-```python
-# Process each rule
-for rule in rules_list:
-    rule_id = rule["rule_id"]
-    sql_exp = rule["sql_exp"]
-    
-    # Create a result DataFrame for this rule
-    rule_result_df = records_df.select(
-        "*",
-        lit(rule_id).alias("rule_id"),
-        lit(sql_exp).alias("sql_exp"),
-        expr(sql_exp).alias("rule_result")
-    )
-    
-    result_dfs.append(rule_result_df)
-
-# Union all result DataFrames
-final_results = result_dfs[0]
-for df in result_dfs[1:]:
-    final_results = final_results.union(df)
-```
-This approach:
-- Processes rules one at a time using a for-loop
-- Creates a separate DataFrame for each rule evaluation
-- Combines results using union operations
-- Simple and straightforward implementation
-- Easy to understand and maintain
-- Good for cases where rules need to be processed sequentially
-
-## Usage
-
-To run any of the examples:
+To run any example, use the following command:
 
 ```bash
-python src/<example_file>.py
+python src/[path]/[example].py
 ```
 
-## Requirements
+## Contributing
 
-- Python 3.x
-- PySpark
-- Apache Spark
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
