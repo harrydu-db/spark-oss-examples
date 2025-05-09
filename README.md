@@ -183,6 +183,36 @@ This approach:
 - More efficient than creating multiple columns
 - Directly evaluates expressions without intermediate columns
 
+### 9. For-Loop Solution (`a_for_rule_loop.py`)
+```python
+# Process each rule
+for rule in rules_list:
+    rule_id = rule["rule_id"]
+    sql_exp = rule["sql_exp"]
+    
+    # Create a result DataFrame for this rule
+    rule_result_df = records_df.select(
+        "*",
+        lit(rule_id).alias("rule_id"),
+        lit(sql_exp).alias("sql_exp"),
+        expr(sql_exp).alias("rule_result")
+    )
+    
+    result_dfs.append(rule_result_df)
+
+# Union all result DataFrames
+final_results = result_dfs[0]
+for df in result_dfs[1:]:
+    final_results = final_results.union(df)
+```
+This approach:
+- Processes rules one at a time using a for-loop
+- Creates a separate DataFrame for each rule evaluation
+- Combines results using union operations
+- Simple and straightforward implementation
+- Easy to understand and maintain
+- Good for cases where rules need to be processed sequentially
+
 ## Usage
 
 To run any of the examples:
