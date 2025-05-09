@@ -33,14 +33,18 @@ rules_data = [
 
 We explore several approaches to solve this problem, each with its own advantages and limitations:
 
-### 1. Direct Expression Evaluation (`1_expr.py`)
+### 1. Using crossjoin (`1_expr.py`)
+
+This code doesn't work, because expr expect a string literal as the input. 
 ```python
 result_df = combined_df.withColumn(
     "rule_passed",
     expr("sql_exp")
 )
 ```
-This approach doesn't work yet. (Spark bug?).
+
+My solution is to create a map from rule_id to the `expr()` function. Then use `when` clause. 
+
 
 ### 2. Basic UDF (`2_udf.py`)
 ```python

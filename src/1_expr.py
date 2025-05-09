@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, expr
+from pyspark.sql.functions import col, expr, when, lit
 from pyspark import SparkContext
 sparkContext = SparkContext.getOrCreate()
 sparkContext.setLogLevel("WARN")
@@ -13,7 +13,7 @@ spark = SparkSession.builder \
 records = [
     (1, 10, 5),
     (2, 20, 15),
-    (3, 30, 25)
+    (3, 30, 30)
 ]
 records_df = spark.createDataFrame(records, ["id", "col1", "col2"])
 
@@ -27,13 +27,25 @@ rules_df = spark.createDataFrame(rules_data, ["rule_id", "sql_exp"])
 # Cross join records with rules to get all combinations
 combined_df = records_df.crossJoin(rules_df)
 
-# Apply the rule evaluation using expr
+# Create a mapping of rule_id to its expr evaluation
+rule_evaluations = {
+    rule_id: expr(sql_exp)
+    for rule_id, sql_exp in rules_data
+}
+
+# Build the when clauses dynamically
+when_clause = None
+for rule_id, _ in rules_data:
+    if when_clause is None:
+        when_clause = when(col("rule_id") == rule_id, rule_evaluations[rule_id])
+    else:
+        when_clause = when_clause.when(col("rule_id") == rule_id, rule_evaluations[rule_id])
+
+# Apply the rule evaluation
 result_df = combined_df.withColumn(
     "rule_passed",
-    expr("sql_exp")
+    when_clause
 )
-
-
 
 # Show the results
 result_df.show(truncate=False)
