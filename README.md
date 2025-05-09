@@ -45,6 +45,8 @@ result_df = combined_df.withColumn(
 
 This solutiom uses a crossjoin, dynamically generated `when` clause,  and `expr`.
 
+Alternatively, you can use a when string with expr(whenstr). See `1_a_whenstr.py`. 
+
 ### 2. Basic UDF (`2_udf.py`)
 ```python
 def evaluate_expr(expression, col1, col2):
