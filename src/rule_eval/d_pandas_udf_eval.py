@@ -52,7 +52,7 @@ def sql_to_python_expr(expr: str) -> str:
     return expr
 
 # Generate data
-records = generate_sample_data(100_000)
+records = generate_sample_data(100)
 records_df = spark.createDataFrame(records, ["id", "col1", "col2", "col3", "col4"])
 
 # Generate rules
@@ -72,7 +72,7 @@ eval_sql_expr_pd = make_eval_sql_expr_pd(records_df.columns)
 result_df = joined_df.withColumn(
     "rule_passed",
     eval_sql_expr_pd(*[col(c) for c in input_cols])
-).filter(col("rule_passed") == True)
+)
 
 # Show results
 print(f"Number of rows: {result_df.count()}")
